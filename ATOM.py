@@ -207,7 +207,7 @@ def atom(irr_times, elsts, angle_distances, maximum_window_size, parameters, vel
 	time_val = g_score[current.ang_idx][current.v_idx] + irr_times[-1]
 	traj = [current.v_idx]
 	while current in came_from:
-		traj.append(came_from[current].v_idx / (vel_res - 1))
+		traj.append(max_v * came_from[current].v_idx / (vel_res - 1))
 		current = came_from[current]
 	traj = list(reversed(traj))
 	return time_val, traj

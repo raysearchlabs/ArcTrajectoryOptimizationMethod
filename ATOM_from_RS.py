@@ -25,7 +25,7 @@ DOWN_SWITCH_TIME = 0.5
 UP_SWITCH_TIME = 5.0
 
 # Irradiation times
-TIME_PER_SPOT_SWITCH = 0.008
+TIME_PER_SPOT_SWITCH = 0.002
 SPOT_DELIVERY_S_PER_MU = 0.005
 
 # This is the velocity resolution used in ATOM.
