@@ -13,12 +13,12 @@ This script might take 1-5 min, depending on the plan. Patience is a virtue. Or 
 #########################################################################
 
 # NOTE: Make sure that the maximum window size is smaller than the angular spacing between 
-MAX_WINDOW_SIZE = 1.99  # TODO: In the future this value will be read automatically from RayStation. 
+MAX_WINDOW_SIZE = 0.99  # TODO: In the future this value will be read automatically from RayStation. 
 
 # Maximum velocity, acceleration and jerk of the gantry.
 VEL_MAX = 5.0
 ACC_MAX = 0.5
-JERK_MAX = 0.25
+JERK_MAX = 0.5
 
 # Energy switching times
 DOWN_SWITCH_TIME = 0.5
@@ -101,26 +101,38 @@ for b in range(len(beams)):
 
 	angles = [beams[b].Segments[i].IonArcSegmentProperties.DeltaGantryAngle for i in range(n)]
 
+	for i in range(len(angles)):
+		while angles[i] >= 360:
+			angles[i] -= 360.0
+		while angles[i] < 0:
+			angles[i] += 360.0	
+
 	angle_distances = [min(abs(angles[i] - angles[i+1]), abs(360-abs(angles[i] - angles[i+1]))) for i in range(len(angles) - 1)]
 	assert min(angle_distances) > 0  # TODO: Handle case where an angle has many energy layers.
 	assert max(angle_distances) < 180  # We don't support this case.
 	assert len(angle_distances) > 2
 	is_clockwise = [calc_is_clockwise(angles[i], angles[i+1]) for i in range(n-1)]
-	direction_change = [is_clockwise[i] and not is_clockwise[i+1] for i in range(n-2)] + [True]
+	direction_change = [is_clockwise[i] == is_clockwise[i+1] for i in range(n-2)]# + [True]
 
-	current_idx = 0
-	while any(direction_change):
-		next_dir_change = direction_change.index(True)
-		direction_change[next_dir_change] = False
+	assert not any(direction_change)  # NOTE: This case is not supported yet.
 
-		irr_times_local = irr_times[current_idx:next_dir_change]
-		elsts_local = elsts[current_idx:next_dir_change - 1]
-		angle_distances_local = angle_distances[current_idx:next_dir_change - 1]
+	irr_times_local = irr_times  # [current_idx:next_dir_change]
+	elsts_local = elsts  # [current_idx:next_dir_change - 1]
+	angle_distances_local = angle_distances  # [current_idx:next_dir_change - 1]
+		
+	print(irr_times_local)
+	print(elsts_local)
 
-		delivery_time, discrete_vels = atom(irr_times_local, elsts_local, angle_distances_local, MAX_WINDOW_SIZE, parameters, VEL_RES)
-		vels = [discrete_vels[i] * parameters["v_max"] / (VEL_RES - 1) for i in range(len(discrete_vels))]
+	delivery_time, vels = atom(irr_times_local, elsts_local, angle_distances_local, MAX_WINDOW_SIZE, parameters, VEL_RES)
+		
+	print(vels)
+	assert len(vels) == len(irr_times_local)
+	print([vels[i]*irr_times_local[i] for i in range(len(vels))])
 
-		current_idx = next_dir_change
+	import matplotlib.pyplot as plt
+	plt.plot(vels)
+	plt.show()
 
-		total_time += delivery_time
+
+	total_time += delivery_time
 	print("TOTAL TIME: ", round(total_time, 3), "[s] for beam", b+1)
