@@ -96,7 +96,7 @@ double calcCost(
 	input.max_acceleration = { aMax };
 	input.max_jerk = { jMax };
 
-	input.min_velocity = { -1.0e-10 };
+	input.min_velocity = { -vMax};
 	input.minimum_duration = elst;
 
 	// We don't need to pass the control rate (cycle time) when using only offline features
