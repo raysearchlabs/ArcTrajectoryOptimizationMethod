@@ -30,3 +30,5 @@ vels = [discrete_vels[i] * parameters["v_max"] / (256-1) for i in range(len(disc
 print("Delivery time [s]:", delivery_time )
 print("Velocities [angle / s]:", vels)
 ```
+
+NOTE: It requires the pip library ruckig, and has been tested using version 0.9.2.
