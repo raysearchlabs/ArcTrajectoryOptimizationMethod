@@ -148,7 +148,7 @@ double atom(
 	assert(!irrTimes.empty());
 	assert(n > 0);
 	const auto irrSum = std::accumulate( irrTimes.cbegin(), --irrTimes.cend(), 0.0 );  // NOTE: We're skipping the last element.
-	const auto elstSum = std::accumulate(elstSum.begin(), elstSum.end(), 0.0);
+	const auto elstSum = std::accumulate(elsts.begin(), elsts.end(), 0.0);
 
 	std::vector<double> heuristicFromAngIdx(n);
 	for (size_t i = 0; i < n; ++i) {
