@@ -70,28 +70,14 @@ def estimate_switch_time(fromNrj, toNrj):
 		return DOWN_SWITCH_TIME
 
 
-def calc_is_clockwise(fromAngle, toAngle):
-	assert fromAngle >= 0
-	assert toAngle >= 0
-	assert fromAngle < 360
-	assert toAngle < 360
-	assert fromAngle != toAngle
-
-	shiftedToAngle = toAngle - fromAngle
-
-	while shiftedToAngle < 0:
-		shiftedToAngle += 360
-
-	return shiftedToAngle < 180
-
-
 plan = get_current("Plan")
 
 beams = list(get_current("BeamSet").Beams)[:]
 parameters = {"v_max": VEL_MAX, "a_max": ACC_MAX, "a_min": -ACC_MAX, "j_max": JERK_MAX}
 
+total_time = 0.0
 for b in range(len(beams)):
-	total_time = 0.0
+	total_beam_time = 0.0
 	n = len(beams[b].Segments)
 
 	nrjs = [beams[b].Segments[i].NominalEnergy for i in range(n)]
@@ -100,7 +86,6 @@ for b in range(len(beams)):
 	irr_times = [calculate_spot_scanning_time(beams[b].BeamMU, beams[b].Segments[i]) + calculat_spot_switching_time(beams[b].Segments[i]) for i in range(n)]
 
 	angles = [beams[b].Segments[i].IonArcSegmentProperties.DeltaGantryAngle for i in range(n)]
-
 	for i in range(len(angles)):
 		while angles[i] >= 360:
 			angles[i] -= 360.0
@@ -108,31 +93,37 @@ for b in range(len(beams)):
 			angles[i] += 360.0	
 
 	angle_distances = [min(abs(angles[i] - angles[i+1]), abs(360-abs(angles[i] - angles[i+1]))) for i in range(len(angles) - 1)]
-	assert min(angle_distances) > 0  # TODO: Handle case where an angle has many energy layers.
 	assert max(angle_distances) < 180  # We don't support this case.
 	assert len(angle_distances) > 2
-	is_clockwise = [calc_is_clockwise(angles[i], angles[i+1]) for i in range(n-1)]
-	direction_change = [is_clockwise[i] == is_clockwise[i+1] for i in range(n-2)]# + [True]
+	direction_change = [False] + [beams[b].Segments[i].IonArcSegmentProperties.RotationDirection != beams[b].Segments[i-1].IonArcSegmentProperties.RotationDirection for i in range(1, n)]
+	should_be_still_list = [False] * (1 + len(angles))
+	for i in range(len(angle_distances)):
+		if i < len(direction_change) and direction_change[i]:
+			should_be_still_list[i] = True
+	should_be_still_list[-1] = True
 
-	assert not any(direction_change)  # NOTE: This case is not supported yet.
+	current_start_idx = 0
+	all_vels = []
+	while True in should_be_still_list:
+		end_idx = should_be_still_list.index(True)
+		should_be_still_list[should_be_still_list.index(True)] = False
 
-	irr_times_local = irr_times  # [current_idx:next_dir_change]
-	elsts_local = elsts  # [current_idx:next_dir_change - 1]
-	angle_distances_local = angle_distances  # [current_idx:next_dir_change - 1]
+		irr_times_local = irr_times[current_start_idx:end_idx]
+		elsts_local = elsts[current_start_idx:end_idx - 1]
+
+		# NOTE: In multirevolution cases, the algorithm will assume that the gantry will teleport between the end of one revolution and the start of the other.
+		#       This should be fine, since they should be the same.
+		angle_distances_local = angle_distances[current_start_idx:end_idx - 1]
 		
-	print(irr_times_local)
-	print(elsts_local)
-
-	delivery_time, vels = atom(irr_times_local, elsts_local, angle_distances_local, MAX_WINDOW_SIZE, parameters, VEL_RES)
+		elst_that_fall_between_arcs = 0.0 if end_idx > len(elsts) else elsts[end_idx - 1] 
+		delivery_time, vels = atom(irr_times_local, elsts_local, angle_distances_local, MAX_WINDOW_SIZE, parameters, VEL_RES)
 		
-	print(vels)
-	assert len(vels) == len(irr_times_local)
-	print([vels[i]*irr_times_local[i] for i in range(len(vels))])
+		total_beam_time += delivery_time + elst_that_fall_between_arcs
+		assert len(vels) == len(irr_times_local)
+		all_vels = all_vels + vels
+		current_start_idx = end_idx
+		all_vels = all_vels + vels
 
-	import matplotlib.pyplot as plt
-	plt.plot(vels)
-	plt.show()
-
-
-	total_time += delivery_time
-	print("TOTAL TIME: ", round(total_time, 3), "[s] for beam", b+1)
+	total_time += total_beam_time
+	print("TOTAL TIME: ", round(total_beam_time, 3), "[s] for beam", b+1)
+print("TOTAL TIME: ", round(total_time, 3), "(assuming that there is no travel time between the beams).")
